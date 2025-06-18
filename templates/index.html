@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flight Recommendation System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="mb-4">✈️ Flight Recommendation System</h1>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Search Flights</h5>
+                <div class="mb-3">
+                    <label for="origin" class="form-label">From (City or Airport Code)</label>
+                    <input type="text" class="form-control" id="origin" value="ARN">
+                </div>
+                <div class="mb-3">
+                    <label for="destination" class="form-label">To (City or Airport Code)</label>
+                    <input type="text" class="form-control" id="destination" value="CCU">
+                </div>
+                <div class="mb-3">
+                    <label for="date" class="form-label">Departure Date</label>
+                    <input type="date" class="form-control" id="date" value="2025-08-01">
+                </div>
+                <button id="searchBtn" class="btn btn-primary">Search Flights</button>
+            </div>
+        </div>
+
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Search Results</h5>
+                <pre id="searchResults" class="bg-dark text-light p-3 rounded overflow-auto" style="max-height: 400px;">
+        (Search results will appear here)
+                </pre>
+            </div>
+        </div>        
+
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Your Preferences</h5>
+                <div class="mb-3">
+                    <label for="prompt" class="form-label">Describe your preferences:</label>
+                    <textarea class="form-control" id="prompt" rows="6" placeholder="traveling alone, cheap flights preferred\ndislike: too long layovers\npreference: international flight at the start"></textarea>
+                </div>
+                <button id="recommendBtn" class="btn btn-success">Recommend Best Flight</button>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Recommendation</h5>
+                <pre id="recommendation" class="bg-dark text-light p-3 rounded overflow-auto"  style="max-height: 400px;">(Recommended flight will appear here)</pre>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let enrichedResults = []
+
+        $("#searchBtn").click(function() {
+            const origin = $('#origin').val();
+            const destination = $('#destination').val();
+            const date = $('#date').val();
+            $.ajax({
+                url: "/search",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ origin, destination, date }),
+                success: function(res) {
+                    enrichedResults = res.enriched;
+                    $('#searchResults').text(JSON.stringify(res.enriched, null, 2));
+                },
+                error: function(err) {
+                    $('#searchResults').text("Error fetching flights");
+                }
+            });
+        });
+
+        $("#recommendBtn").click(function() {
+            const prompt = $('#prompt').val();
+            if (enrichedResults.length === 0) {
+                $('#recommendation').text("Please search for flights first.");
+                return;
+            }
+            $.ajax({
+                url: "/recommend",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ enriched: enrichedResults, prompt }),
+                success: function(res) {
+                    $('#recommendation').text(JSON.stringify(res, null, 2));
+                },
+                error: function(err) {
+                    $('#recommendation').text("Error generating recommendation");
+                }
+            });
+        });
+    </script>
+</body>
+</html>
