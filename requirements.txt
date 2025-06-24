@@ -2,3 +2,4 @@ Flask
 gunicorn
 requests
 openai
+supabase

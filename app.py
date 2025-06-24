@@ -4,12 +4,24 @@ import json
 import requests
 from datetime import date
 from openai import OpenAI
+from supabase import create_client, Client
+from flask import Flask, request, render_template, jsonify, session
+from datetime import timedelta
+
+
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret")  # must be secret in production!
+app.permanent_session_lifetime = timedelta(hours=1)
 
 API_KEY = os.getenv("DEEPSEEK_API_KEY")
 AMADEUS_CLIENT_ID = os.getenv("AMADEUS_CLIENT_ID")
 AMADEUS_CLIENT_SECRET = os.getenv("AMADEUS_CLIENT_SECRET")
+
+# Read from environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 
 # Cache token in memory
 amadeus_token = None
@@ -139,6 +151,13 @@ def search():
     origin = data.get("origin")
     destination = data.get("destination")
     dep_date = data.get("date")
+
+     # Persist in session
+    session.permanent = True
+    session["origin"] = origin
+    session["destination"] = destination
+    session["dep_date"] = dep_date
+
     token = get_amadeus_token()
     if not token:
         return jsonify({"error": "Token error"}), 400
@@ -154,6 +173,13 @@ def recommend():
     data = request.json
     enriched = data.get("enriched")
     user_prompt = data.get("prompt")
+
+    # Read persisted info
+    origin = session.get("origin")
+    destination = session.get("destination")
+    dep_date = session.get("dep_date")
+
+
     print(user_prompt)
     print('_'*10)
     enriched_str = format_enriched_flights_full(enriched)
@@ -193,7 +219,26 @@ Do not give anything extra
         result = json.loads(response.choices[0].message.content)
         print(result)
         offer_id = int(result['offer_id'])
+        print(offer_id)
         selected = next((x for x in enriched if int(x['offer_id']) == offer_id), None)
+        
+
+        # add data to supabase
+        # Initialize Supabase client
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print('supa client created')
+        supa_user_query_data = {
+            "departure": origin,
+            "arrival": destination,
+            "travel_date": dep_date,
+            "user_prompt": user_prompt,
+            "optimized_user_prompt": "placeholder for optimal prompt"
+        }
+        response = supabase.table("userQueries").insert(supa_user_query_data).execute()
+
+
+
+
         return jsonify({"recommended": selected, "justification": result.get("justification", "")})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
