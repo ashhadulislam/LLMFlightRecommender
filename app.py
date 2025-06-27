@@ -43,7 +43,7 @@ def get_amadeus_token():
         return amadeus_token
     return None
 
-def search_flights(token, origin, destination, date, adults=1, max_results=5):
+def search_flights(token, origin, destination, date, adults=1, max_results=10):
     url = "https://test.api.amadeus.com/v2/shopping/flight-offers"
     headers = {'Authorization': f'Bearer {token}'}
     params = {
