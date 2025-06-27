@@ -178,10 +178,13 @@ def recommend():
     origin = session.get("origin")
     destination = session.get("destination")
     dep_date = session.get("dep_date")
+    optimized_user_prompt=run_finetunerecoprompt(user_prompt)
 
 
     print(user_prompt)
     print('_'*10)
+    print(optimized_user_prompt)
+    print('-'*10)
     enriched_str = format_enriched_flights_full(enriched)
 
 
@@ -211,7 +214,7 @@ Do not give anything extra
             model="deepseek-chat",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+                {"role": "user", "content": optimized_user_prompt}
             ],
             response_format={'type': 'json_object'}
         )
@@ -220,8 +223,7 @@ Do not give anything extra
         print(result)
         offer_id = int(result['offer_id'])
         print(offer_id)
-        selected = next((x for x in enriched if int(x['offer_id']) == offer_id), None)
-        
+        selected = next((x for x in enriched if int(x['offer_id']) == offer_id), None)        
 
         # add data to supabase
         # Initialize Supabase client
@@ -232,16 +234,57 @@ Do not give anything extra
             "arrival": destination,
             "travel_date": dep_date,
             "user_prompt": user_prompt,
-            "optimized_user_prompt": "placeholder for optimal prompt"
+            "optimized_user_prompt": optimized_user_prompt
         }
         response = supabase.table("userQueries").insert(supa_user_query_data).execute()
 
 
 
 
+
+
         return jsonify({"recommended": selected, "justification": result.get("justification", "")})
     except Exception as e:
+        if 'justification' in result:
+            return {"recommended": 'None', "justification": result.get("justification", "")}
         return jsonify({"error": str(e)}), 500
+
+@app.route("/finetunerecoprompt", methods=["POST"])
+def serve_finetunerecoprompt():
+    data = request.json    
+    user_prompt = data.get("prompt")
+    optimized_prompt=run_finetunerecoprompt(user_prompt)
+    return jsonify({"optimized_prompt": optimized_prompt})
+
+
+def run_finetunerecoprompt(user_prompt):
+    system_prompt = f"""
+You are an expert flight search query analyst.
+Your task is to go through the users query and enrich their prompt
+Infer IMPLICIT parameters from the user query adding more details and conditions that would help a travel agent understnad the need of the traveller
+Keep it brief, one paragraph
+"""
+    #print(system_prompt)    
+    print('*'*10)
+
+    api_client = OpenAI(api_key=API_KEY, base_url="https://api.deepseek.com")
+    try:        
+        response = api_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            #response_format={'type': 'json_object'}
+        )
+
+        optimized_prompt = response.choices[0].message.content
+        
+        return optimized_prompt
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
