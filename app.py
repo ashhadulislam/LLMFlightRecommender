@@ -22,6 +22,7 @@ AMADEUS_CLIENT_SECRET = os.getenv("AMADEUS_CLIENT_SECRET")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Cache token in memory
 amadeus_token = None
@@ -226,8 +227,7 @@ Do not give anything extra
         selected = next((x for x in enriched if int(x['offer_id']) == offer_id), None)        
 
         # add data to supabase
-        # Initialize Supabase client
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # Initialize Supabase client        
         print('supa client created')
         supa_user_query_data = {
             "departure": origin,
@@ -237,11 +237,6 @@ Do not give anything extra
             "optimized_user_prompt": optimized_user_prompt
         }
         response = supabase.table("userQueries").insert(supa_user_query_data).execute()
-
-
-
-
-
 
         return jsonify({"recommended": selected, "justification": result.get("justification", "")})
     except Exception as e:
@@ -262,7 +257,7 @@ def run_finetunerecoprompt(user_prompt):
 You are an expert flight search query analyst.
 Your task is to go through the users query and enrich their prompt
 Infer IMPLICIT parameters from the user query adding more details and conditions that would help a travel agent understnad the need of the traveller
-Keep it brief, one paragraph
+Keep it brief, one paragraph.
 """
     #print(system_prompt)    
     print('*'*10)
@@ -284,6 +279,16 @@ Keep it brief, one paragraph
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/user-queries')
+def get_user_queries():
+    response = supabase.table("userQueries").select("*").execute()
+    return jsonify(response.data)
+
+
+@app.route('/show-user-queries')
+def show_user_queries():
+    return render_template("queries.html")
 
 
 if __name__ == '__main__':
